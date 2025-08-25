@@ -1,122 +1,97 @@
 
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta charset="UTF-8">
-      <title>NPC Relationship Change Viewer</title>
-      <style>
-        body { font-family: sans-serif; padding: 20px; }
-        .tag { display: inline-block; background: #eee; padding: 5px 10px; margin: 5px; cursor: pointer; border-radius: 3px; }
-        .tag.selected { background: #007bff; color: #fff; }
-        #pair-select { margin: 15px 0; }
-        .event { border: 1px solid #ccc; padding: 10px; margin: 10px 0; border-radius: 5px; }
-        .arrow { font-size: 18px; margin: 0 5px; }
-      </style>
-    </head>
-    <body>
-      <h2>NPC Relationship Change Viewer</h2>
-      <div id="tags"></div>
-      <div id="pair-select" style="display:none;">
-        <label>
-          Select Other NPC:
-          <select id="target-select"><option value="">--</option></select>
-        </label>
-      </div>
-      <div id="events"></div>
-      <script>
-        // Injected changes from Python
-        const changes = 
-    [
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>NPC Relationship Change Viewer</title>
+<style>
+  :root { --muted:#666; --chip:#eef2f7; --accent:#0d6efd; }
+  body { font-family: system-ui, sans-serif; padding: 20px; line-height: 1.35; }
+  h2 { margin: 0 0 10px; }
+  .sub { color: var(--muted); margin: 0 0 16px; }
+  .tag { display:inline-block; background:#eee; padding:6px 10px; margin:5px 8px 5px 0;
+         cursor:pointer; border-radius:14px; font-size:14px; user-select:none }
+  .tag.selected { background: var(--accent); color:#fff; }
+  #pair-select { margin: 14px 0; }
+  #events { margin-top: 10px; }
+  .event { border:1px solid #ddd; padding:12px; margin:10px 0; border-radius:10px; background:#fff; }
+  .row { display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
+  .chip { background:var(--chip); padding:4px 8px; border-radius:999px; font-size:12px; }
+  .arrow { margin:0 6px; }
+  .muted { color: var(--muted); }
+  .kv { margin:6px 0 0 0; }
+  .kv strong { display:inline-block; width:105px; color:#333; }
+  .empty { display:none; }
+  select { padding:6px 10px; border-radius:8px; border:1px solid #ccc; }
+  code { background:#f6f8fa; padding:2px 6px; border-radius:6px; }
+</style>
+</head>
+<body>
+  <h2>NPC Relationship Change Viewer</h2>
+  <p class="sub">Pick a <em>source</em> NPC, then a target. Only non-empty fields are shown.</p>
+  <div id="tags"></div>
+  <div id="pair-select" style="display:none;">
+    <label>
+      Select Other NPC:&nbsp;
+      <select id="target-select"><option value="">--</option></select>
+    </label>
+  </div>
+  <div id="events"></div>
+  <script>
+    // Injected from Python:
+    const changes =
+[
   {
-    "event": "Event 1*Arthur*said something *Very good* About *Arthur* To *Celin*",
-    "source": "Celin",
-    "target": "Arthur",
-    "originalAttitude": "Intrested",
-    "newAttitude": null,
-    "originalRelation": "Know",
-    "newRelation": null,
-    "intermediatorDialogue": "You're kind to say so, Master Arthur… though it's rare one speaks well of oneself. Still, welcome to our town.",
-    "RecipientDialogue": "Ah, just speaking truth where it's due. Thank you, goodwife.",
-    "Rationale": null
+    "event": "Event 1*Arthur*said something *Very good* About *Arthur* To *Dylan*",
+    "source": "dylan",
+    "target": "arthur",
+    "originalAttitude": null,
+    "newAttitude": "Disdainful",
+    "originalRelation": null,
+    "newRelation": "Aware of",
+    "intermediatorDialogue": "Words are wind, adventurer. When steel sings, we’ll see what truth lies in them.",
+    "RecipientDialogue": "Heh. You’ll see soon enough, old knight. I don’t just talk—I deliver.",
+    "Rationale": "Arthur’s self-praise confirms Dylan’s suspicion: the man boasts but is untested. Dylan now holds him in quiet contempt."
   },
   {
-    "event": "Event 2*Arthur*said something *Bad* About *Bob* To *Eden*",
-    "source": "Eden",
-    "target": "Arthur",
-    "originalAttitude": "Curious",
-    "newAttitude": null,
-    "originalRelation": "Heard of",
-    "newRelation": null,
-    "intermediatorDialogue": "Your tongue wags too freely for one new to these hills. Speak ill of the wrong vessel and the winds may shift against you.",
-    "RecipientDialogue": "I meant no offense, Master Eden… only concern.",
-    "Rationale": null
-  },
-  {
-    "event": "Event 3*Arthur*said something *Good* About *Bob* To *Dylan*",
-    "source": "Dylan",
-    "target": "Arthur",
-    "originalAttitude": "Suspicious",
-    "newAttitude": null,
-    "originalRelation": "Aware of",
-    "newRelation": null,
-    "intermediatorDialogue": "Strange words for a strange man. Bob’s path is his own—best not walk too close to it.",
-    "RecipientDialogue": "Only meant to say he’s not as lost as he seems.",
-    "Rationale": null
-  },
-  {
-    "event": "Event 4*Arthur*said something *Bad* About *Alex* To *Celin*",
-    "source": "Celin",
-    "target": "Arthur",
+    "event": "Event 1*Arthur*said something *Very good* About *Arthur* To *Dylan*",
+    "source": "dylan",
+    "target": "bob",
     "originalAttitude": null,
     "newAttitude": null,
     "originalRelation": null,
     "newRelation": null,
-    "intermediatorDialogue": "That’s uncalled for. You know little of him—and less of me, if you thought I’d take kindly to such talk.",
-    "RecipientDialogue": "I... didn’t mean offense, only honesty. Still, I see I've overstepped.",
+    "intermediatorDialogue": "That braggart’s voice grates like rusted mail. I’ll keep one hand near my blade.",
+    "RecipientDialogue": "...boasting birds fly lowest before the fall... mm... wings of wax, yes...",
     "Rationale": null
   },
   {
-    "event": "Event 5*Arthur*said something *Bad* About *Celin* To *Celin*",
-    "source": "Celin",
-    "target": "Arthur",
+    "event": "Event 2*Arthur*said something *Very good* About *Eden* To *Eden*",
+    "source": "eden",
+    "target": "arthur",
     "originalAttitude": null,
-    "newAttitude": null,
+    "newAttitude": "Mildly Intrigued",
     "originalRelation": null,
-    "newRelation": null,
-    "intermediatorDialogue": "Leave my doorstep now. You’ve no place among decent folk with words like those.",
-    "RecipientDialogue": "Tch. Fragile as glass, just as I thought.",
-    "Rationale": null
-  },
-  {
-    "event": "Event 6*Arthur*said something *Good* About *Celin* To *Alex*",
-    "source": "Alex",
-    "target": "Arthur",
-    "originalAttitude": "Neutral/Don't care",
-    "newAttitude": null,
-    "originalRelation": "Know",
-    "newRelation": null,
-    "intermediatorDialogue": "Aye, she’s the quiet heart of this place. Glad to see a newcomer with eyes to see it.",
-    "RecipientDialogue": "Credit where it’s due. You’re lucky, friend.",
-    "Rationale": null
-  },
-  {
-    "event": "Event 7*Arthur*said something *Neutral* About *Bob* To *Alex*",
-    "source": "Alex",
-    "target": "Arthur",
-    "originalAttitude": null,
-    "newAttitude": null,
-    "originalRelation": null,
-    "newRelation": null,
-    "intermediatorDialogue": "Bob’s… peculiar, sure. But he’s never done me harm. Folk carry all sorts of burdens.",
-    "RecipientDialogue": "Didn’t mean ill, just hard to get a read on him.",
-    "Rationale": null
+    "newRelation": "Heard of",
+    "intermediatorDialogue": "You know my name. Few speak it without tremble or scorn. What is it you seek, adventurer?",
+    "RecipientDialogue": "Only to show respect, Master Eden. I’ve heard of your power... and I admire it.",
+    "Rationale": "Praise from a stranger means little, but Eden notes Arthur’s knowledge of his name—it piques a flicker of interest in an otherwise indifferent mind."
   }
 ];
 
-        // (JS code for rendering, same as before)
-        // ... (copy from the previous HTML after "const changes = ...;" )
-        // Build list of unique NPC names
-        const names = Array.from(new Set(changes.map(c => c.source))).sort();
+// ---------- Helpers ----------
+function safe(x) { return (x === undefined || x === null) ? "" : String(x); }
+function nz(x, alt="—") { const s = safe(x).trim(); return s ? s : alt; }
+function hasVal(x){ return x !== undefined && x !== null && String(x).trim() !== ""; }
+function arrowRow(label, oldV, newV){
+  if (!hasVal(oldV) && !hasVal(newV)) return "";
+  const left = nz(oldV), right = nz(newV);
+  if (left === "—" && right === "—") return "";
+  return `<div class="kv"><strong>${label}:</strong> <span>${left}</span><span class="arrow"> → </span><span>${right}</span></div>`;
+}
+
+// Build list of unique NPC names that appeared as a source
+const names = Array.from(new Set(changes.map(c => c.source).filter(Boolean))).sort();
 
 let source = null, target = null;
 const tagsDiv       = document.getElementById('tags');
@@ -130,23 +105,22 @@ names.forEach(n => {
   btn.textContent = n;
   btn.className = 'tag';
   btn.onclick = () => {
-    // highlight
     document.querySelectorAll('.tag').forEach(t => t.classList.remove('selected'));
     btn.classList.add('selected');
     source = n;
-    // Only include targets with at least one event involving (source, target)
+
+    // targets tied to this source
     const possibleTargets = Array.from(new Set(
-      changes
-        .filter(c => c.source === source)
-        .map(c => c.target)
-    ));
-    targetSelect.innerHTML = '';  // Remove the "--"
-    possibleTargets.forEach((x, i) => {
+      changes.filter(c => c.source === source && hasVal(c.target)).map(c => c.target)
+    )).sort();
+
+    targetSelect.innerHTML = '';
+    possibleTargets.forEach(x => {
       const opt = document.createElement('option');
       opt.value = x; opt.textContent = x;
       targetSelect.appendChild(opt);
     });
-    // Automatically select the first target if available and display events
+
     if (possibleTargets.length > 0) {
       targetSelect.selectedIndex = 0;
       target = possibleTargets[0];
@@ -159,7 +133,6 @@ names.forEach(n => {
   tagsDiv.appendChild(btn);
 });
 
-// When other NPC chosen
 targetSelect.onchange = () => {
   target = targetSelect.value;
   renderEvents();
@@ -169,33 +142,64 @@ function renderEvents() {
   eventsDiv.innerHTML = '';
   if (!source || !target) return;
 
-  // Only show events where selected source initiated a change toward target
-  const pairEvents = changes
-    .filter(c => c.source === source && c.target === target);
+  // Show all events matching (source, target)
+  const pairEvents = changes.filter(c => c.source === source && c.target === target);
 
   if (pairEvents.length === 0) {
     eventsDiv.textContent = `No changes recorded between ${source} and ${target}.`;
     return;
   }
 
-  // Render each event
   pairEvents.forEach((c, i) => {
-    const div = document.createElement('div');
-    div.className = 'event';
-    div.innerHTML = `
-      <strong>${c.event ? c.event : `Event ${i + 1}`}</strong><br>
-      <span>${c.source} → ${c.target}</span>
-      <span class="arrow">:</span>
-      <em>${c.originalAttitude} → ${c.newAttitude}</em>,
-      <em>${c.originalRelation} → ${c.newRelation}</em>
-      <p><strong>I:</strong> ${c.intermediatorDialogue}</p>
-      <p><strong>R:</strong> ${c.RecipientDialogue}</p>
-      <p><strong>Reason:</strong> ${c.Rationale}</p>
+    const ev = document.createElement('div');
+    ev.className = 'event';
+
+    const headline = safe(c.event) ? safe(c.event) : `Event ${i + 1}`;
+    const iDia = nz(c.intermediatorDialogue, "");
+    const rDia = nz(c.RecipientDialogue, "");
+    const rationale = nz(c.Rationale, "");
+
+    // Build rows conditionally (hide when empty)
+    const attRow = arrowRow("Attitude", c.originalAttitude, c.newAttitude);
+    const relRow = arrowRow("Relation", c.originalRelation, c.newRelation);
+    const dialogI = hasVal(iDia) ? `<div class="kv"><strong>I:</strong> ${iDia}</div>` : "";
+    const dialogR = hasVal(rDia) ? `<div class="kv"><strong>R:</strong> ${rDia}</div>` : "";
+    const reason  = hasVal(rationale) ? `<div class="kv"><strong>Reason:</strong> ${rationale}</div>` : "";
+
+    // Optional chips summarizing what's present
+    const chips = [];
+    if (attRow) chips.push(`<span class="chip">Attitude</span>`);
+    if (relRow) chips.push(`<span class="chip">Relation</span>`);
+    if (dialogI || dialogR) chips.push(`<span class="chip">Dialogue</span>`);
+    if (reason) chips.push(`<span class="chip">Rationale</span>`);
+
+    ev.innerHTML = `
+      <div class="row">
+        <div><strong>${headline}</strong></div>
+        <div class="chip">${safe(c.source)}</div>
+        <div class="chip">→</div>
+        <div class="chip">${safe(c.target)}</div>
+        ${chips.join('')}
+      </div>
+      ${attRow}
+      ${relRow}
+      ${dialogI}
+      ${dialogR}
+      ${reason}
     `;
-    eventsDiv.appendChild(div);
+
+    // If literally nothing to show, collapse to a minimal line
+    if (!attRow && !relRow && !dialogI && !dialogR && !reason) {
+      ev.innerHTML = `
+        <div class="row">
+          <div><strong>${headline}</strong></div>
+          <span class="muted">No change payload (dialog/att/rel/rationale missing).</span>
+        </div>`;
+    }
+
+    eventsDiv.appendChild(ev);
   });
 }
-      </script>
-    </body>
-    </html>
-    
+  </script>
+</body>
+</html>
