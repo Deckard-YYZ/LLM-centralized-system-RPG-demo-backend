@@ -25,22 +25,22 @@ def npc_relation_map(filepath):
 
 def _normalize_change_records(messages):
     """
-    Merge message fragments into per-(src,tgt) records that may contain:
-      newAttitude, newRelation, intermediatorDialogue, RecipientDialogue, Rationale
-    Supports both old and new schemas.
+    Always build (src, tgt) = (intermediatorID, other).
+    other := AttAndRelRCPT (new short) | RecipientID (dialog) | starterID (old short)
+    Merge fragments per (src,tgt) only (no cross-target merging).
     """
-    buckets = {}  # (src, tgt) -> merged dict
+    buckets = {}  # (src, tgt) -> merged record
 
     for m in messages or []:
-        # Source
         src = m.get('intermediatorID') or m.get('IntermediatorID')
-        # Target can appear under different keys depending on schema
-        tgt = (
-            m.get('RecipientID') or
-            m.get('AttAndRelRCPT') or
-            m.get('starterID')  # old "short" record: target is starterID
-        )
-        if not src or not tgt:
+        if not src:
+            continue
+
+        # choose target deterministically
+        tgt = (m.get('AttAndRelRCPT') or
+               m.get('RecipientID') or
+               m.get('starterID'))
+        if not tgt:
             continue
 
         key = (src, tgt)
@@ -50,68 +50,53 @@ def _normalize_change_records(messages):
             'intermediatorDialogue': None, 'RecipientDialogue': None, 'Rationale': None
         })
 
-        # Map all known variants
+        # map variants
         new_att = m.get('ItoR_AttitudeChangeTo') or m.get('AttitudeChange')
         new_rel = m.get('ItoR_RelTypeChangeTo') or m.get('RelationshipTypeChange')
+        if new_att is not None: rec['newAttitude'] = new_att
+        if new_rel is not None: rec['newRelation'] = new_rel
 
-        if new_att is not None:
-            rec['newAttitude'] = new_att
-        if new_rel is not None:
-            rec['newRelation'] = new_rel
-
-        if 'intermediatorDialogue' in m:
-            rec['intermediatorDialogue'] = m['intermediatorDialogue']
-        if 'RecipientDialogue' in m:
-            rec['RecipientDialogue'] = m['RecipientDialogue']
-        if 'Rationale' in m:
-            rec['Rationale'] = m['Rationale']
+        if 'intermediatorDialogue' in m: rec['intermediatorDialogue'] = m['intermediatorDialogue']
+        if 'RecipientDialogue' in m:     rec['RecipientDialogue'] = m['RecipientDialogue']
+        if 'Rationale' in m:             rec['Rationale'] = m['Rationale']
 
     return list(buckets.values())
 
 
+
 def update_npc_map_with_messages(event, npc_map, messages, changes):
-    """
-    Applies merged JSON messages to update NPC relations (schema-agnostic).
-    Captures original and new values for each change.
-    Returns the updated map and the appended change records.
-    """
     npc_map = npc_map or {}
-    changes = changes or []
+    changes  = changes or []
 
     for rec in _normalize_change_records(messages):
-        src = rec['source']
-        tgt = rec['target']
+        src, tgt = rec['source'].capitalize(), rec['target'].capitalize()
+
+
+        # READ originals using resolved keys
+        orig_att = npc_map.get(src, {}).get(tgt, {}).get('Attitude')
+        orig_rel = npc_map.get(src, {}).get(tgt, {}).get('relation')
+
+        # ensure path using resolved keys
+        npc_map.setdefault(src, {}).setdefault(tgt, {})
+
         new_att = rec.get('newAttitude')
         new_rel = rec.get('newRelation')
-        dialog_i = rec.get('intermediatorDialogue')
-        dialog_r = rec.get('RecipientDialogue')
-        rationale = rec.get('Rationale')
+        if new_att is not None: npc_map[src][tgt]['Attitude'] = new_att
+        if new_rel is not None: npc_map[src][tgt]['relation'] = new_rel
 
-        npc_map.setdefault(src, {}).setdefault(tgt, {})
-        orig_att = npc_map[src][tgt].get('Attitude')
-        orig_rel = npc_map[src][tgt].get('relation')
-
-        # Only write fields that are provided (avoid overwriting with None)
-        if new_att is not None:
-            npc_map[src][tgt]['Attitude'] = new_att
-        if new_rel is not None:
-            npc_map[src][tgt]['relation'] = new_rel
-
-        # Skip completely empty records
-        if any(v is not None for v in (new_att, new_rel, dialog_i, dialog_r, rationale)):
+        if any(v is not None for v in (new_att, new_rel,
+                                       rec.get('intermediatorDialogue'),
+                                       rec.get('RecipientDialogue'),
+                                       rec.get('Rationale'))):
             changes.append({
                 'event': event,
-                'source': src,
-                'target': tgt,
-                'originalAttitude': orig_att,
-                'newAttitude': new_att,
-                'originalRelation': orig_rel,
-                'newRelation': new_rel,
-                'intermediatorDialogue': dialog_i,
-                'RecipientDialogue': dialog_r,
-                'Rationale': rationale
+                'source': src, 'target': tgt,
+                'originalAttitude': orig_att, 'newAttitude': new_att,
+                'originalRelation': orig_rel, 'newRelation': new_rel,
+                'intermediatorDialogue': rec.get('intermediatorDialogue'),
+                'RecipientDialogue': rec.get('RecipientDialogue'),
+                'Rationale': rec.get('Rationale')
             })
-
     return npc_map, changes
 
 
@@ -153,7 +138,7 @@ def store_change_history(changes):
   <div id="tags"></div>
   <div id="pair-select" style="display:none;">
     <label>
-      Select Other NPC:&nbsp;
+      Select Other Actor:&nbsp;
       <select id="target-select"><option value="">--</option></select>
     </label>
   </div>
@@ -228,9 +213,7 @@ function renderEvents() {
   eventsDiv.innerHTML = '';
   if (!source || !target) return;
 
-  // Show all events matching (source, target)
   const pairEvents = changes.filter(c => c.source === source && c.target === target);
-
   if (pairEvents.length === 0) {
     eventsDiv.textContent = `No changes recorded between ${source} and ${target}.`;
     return;
@@ -240,31 +223,38 @@ function renderEvents() {
     const ev = document.createElement('div');
     ev.className = 'event';
 
-    const headline = safe(c.event) ? safe(c.event) : `Event ${i + 1}`;
-    const iDia = nz(c.intermediatorDialogue, "");
-    const rDia = nz(c.RecipientDialogue, "");
-    const rationale = nz(c.Rationale, "");
+    const headline = (c.event && String(c.event)) ? c.event : `Event ${i + 1}`;
 
-    // Build rows conditionally (hide when empty)
-    const attRow = arrowRow("Attitude", c.originalAttitude, c.newAttitude);
-    const relRow = arrowRow("Relation", c.originalRelation, c.newRelation);
-    const dialogI = hasVal(iDia) ? `<div class="kv"><strong>I:</strong> ${iDia}</div>` : "";
-    const dialogR = hasVal(rDia) ? `<div class="kv"><strong>R:</strong> ${rDia}</div>` : "";
-    const reason  = hasVal(rationale) ? `<div class="kv"><strong>Reason:</strong> ${rationale}</div>` : "";
+    // SHOW ONLY IF A *NEW* VALUE IS PROVIDED
+    const hasNewAtt = c.newAttitude !== undefined && c.newAttitude !== null && String(c.newAttitude).trim() !== '';
+    const hasNewRel = c.newRelation !== undefined && c.newRelation !== null && String(c.newRelation).trim() !== '';
 
-    // Optional chips summarizing what's present
+    // rename label to Relationship
+    const attRow = hasNewAtt ? `<div class="kv"><strong>Attitude:</strong> <span>${c.originalAttitude ?? '—'}</span><span class="arrow"> → </span><span>${c.newAttitude}</span></div>` : '';
+    const relRow = hasNewRel ? `<div class="kv"><strong>Relationship:</strong> <span>${c.originalRelation ?? '—'}</span><span class="arrow"> → </span><span>${c.newRelation}</span></div>` : '';
+
+    const iDia = (c.intermediatorDialogue ?? '').trim();
+    const rDia = (c.RecipientDialogue ?? '').trim();
+    const rationale = (c.Rationale ?? '').trim();
+
+    const dialogI = iDia ? `<div class="kv"><strong>I:</strong> ${iDia}</div>` : "";
+    const dialogR = rDia ? `<div class="kv"><strong>R:</strong> ${rDia}</div>` : "";
+    // show rationale only if present (prevents leaking it to dialogue-only pairs)
+    const reason  = rationale ? `<div class="kv"><strong>Reason:</strong> ${rationale}</div>` : "";
+
+    // Chips reflect what’s actually shown
     const chips = [];
-    if (attRow) chips.push(`<span class="chip">Attitude</span>`);
-    if (relRow) chips.push(`<span class="chip">Relation</span>`);
+    if (hasNewAtt) chips.push(`<span class="chip">Attitude</span>`);
+    if (hasNewRel) chips.push(`<span class="chip">Relationship</span>`);
     if (dialogI || dialogR) chips.push(`<span class="chip">Dialogue</span>`);
     if (reason) chips.push(`<span class="chip">Rationale</span>`);
 
     ev.innerHTML = `
       <div class="row">
         <div><strong>${headline}</strong></div>
-        <div class="chip">${safe(c.source)}</div>
+        <div class="chip">${c.source}</div>
         <div class="chip">→</div>
-        <div class="chip">${safe(c.target)}</div>
+        <div class="chip">${c.target}</div>
         ${chips.join('')}
       </div>
       ${attRow}
@@ -274,18 +264,19 @@ function renderEvents() {
       ${reason}
     `;
 
-    // If literally nothing to show, collapse to a minimal line
+    // If nothing to show (e.g., only empty payload), collapse
     if (!attRow && !relRow && !dialogI && !dialogR && !reason) {
       ev.innerHTML = `
         <div class="row">
           <div><strong>${headline}</strong></div>
-          <span class="muted">No change payload (dialog/att/rel/rationale missing).</span>
+          <span class="muted">No visible change.</span>
         </div>`;
     }
 
     eventsDiv.appendChild(ev);
   });
 }
+
   </script>
 </body>
 </html>
