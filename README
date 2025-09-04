@@ -1,4 +1,4 @@
 run this first:
 cd C:\Program Files\Google\Chrome\Application
 chrome.exe --remote-debugging-port=9223 --user-data-dir="C:\chrome_debug_temp"
-Then login chatGPT, go to the chat; then start backend
+Then login chatGPT, go to the chat; send the prompt; then start backend
